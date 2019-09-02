@@ -156,9 +156,9 @@ namespace Fantasy
         //316403 - nasata
         //313 - overall
         //147 - macedonia
-        static string standings = @"api/leagues-classic/314/standings/?page_new_entries=1&page_standings={0}&phase=1";
-        static string statics = @"api/bootstrap-static";
-        static string teamPicks = @"api/entry/{0}/event/{1}/picks";
+        static string standings = @"api/leagues-classic/1006694/standings/?page_new_entries=1&page_standings={0}&phase=1";
+        static string statics = @"api/bootstrap-static/";
+        static string teamPicks = @"api/entry/{0}/event/{1}/picks/";
 
         static int TotalPlayersConsidered = 50;
 
@@ -527,6 +527,8 @@ namespace Fantasy
                 httpClient.BaseAddress = new Uri(host);
                 httpClient.DefaultRequestHeaders.Clear();
                 httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36");
+                httpClient.DefaultRequestHeaders.Add("Cookie", "_ga=GA1.2.1480701568.1566132699; pl_profile=\"eyJzIjogIld6SXNOREV4TWpBNU5UVmQ6MWh6S2ZsOnVxT1M2UmV2TXIwaXFZeU1IbHNlWGVUdk9CMCIsICJ1IjogeyJpZCI6IDQxMTIwOTU1LCAiZm4iOiAiTWFya28iLCAibG4iOiAiVnVja292aWsiLCAiZmMiOiBudWxsfX0=\"; csrftoken=WOjPvRKPx3ZeKxSYxTnZQNSGOJIiHeU5gog92kgVFTuGtgCY6Lw35JrSTBT12w5c; sessionid=.eJyrVopPLC3JiC8tTi2Kz0xRslIyMTQ0MrA0NVXSQZZKSkzOTs0DyRfkpBXk6IFk9AJ8QoFyxcHB_o5ALqqGjMTiDKBqwzST5DRzizRjgzRj0zQTI5NEAzNTC9NkM6ANyRZJFibGKSaGFpbGSrUAdi4rvg:1hzKfm:eAgbtKFgU5gY9mRGJnn2hszQRPk; _gid=GA1.2.721012367.1567081929; _gat=1");
+
                 var result = await httpClient.GetAsync(path);
                 if (result.IsSuccessStatusCode)
                 {
