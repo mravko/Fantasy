@@ -1,22 +1,29 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using Fantasy.Web.Models;
 using Microsoft.AspNetCore.Mvc;
-using Fantasy.Web.Models;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Caching.Memory;
+using System.Diagnostics;
+using System.Threading.Tasks;
 
 namespace Fantasy.Web.Controllers
 {
     public class HomeController : Controller
     {
-        public IActionResult Index()
+        private readonly IHubContext<Hubs, IComHub> hubContext;
+
+        public HomeController(IHubContext<Hubs, IComHub> hubContext)
         {
+            this.hubContext = hubContext;
+        }
+        public async Task<IActionResult> Index()
+        {
+            await hubContext.Clients.All.ReceiveData("hello");
+
             return View();
         }
 
-        public IActionResult Privacy()
-        {
+        public async Task<IActionResult> Privacy()
+        {   
             return View();
         }
 
@@ -24,6 +31,24 @@ namespace Fantasy.Web.Controllers
         public IActionResult Error()
         {
             return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+        }
+    }
+
+    [ApiController]
+    [Route("api/")]
+    public class TeamController : ControllerBase
+    {
+        private readonly IMemoryCache memoryCache;
+
+        public TeamController(IMemoryCache memoryCache)
+        {
+            this.memoryCache = memoryCache;
+        }
+
+        [HttpGet()]
+        public ActionResult<object> GetTeamFromCache()
+        {
+            return memoryCache.Get("teamcache");
         }
     }
 }

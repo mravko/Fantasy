@@ -1,188 +1,62 @@
-﻿using System;
+﻿using Microsoft.AspNetCore.SignalR.Client;
+using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
-using System.Text;
 using System.Threading.Tasks;
-using Newtonsoft.Json.Linq;
 using TableParser;
 
 namespace Fantasy
 {
-    public enum Position
+    internal class Program
     {
-        GK,
-        DEF,
-        MID,
-        FWD
-    }
+        private static readonly string host = @"https://fantasy.premierleague.com/";
 
-    public class Team
-    {
-        public Tuple<int, int, int> Formation = new Tuple<int, int, int>(4, 5, 1);
-        public Player Gk { get; set; }
-
-        public Player SubGk { get; set; }
-
-        public List<Player> Defenders { get; set; } = new List<Player>();
-        public List<Player> SubDefenders { get; set; } = new List<Player>();
-
-        public List<Player> Midfielders { get; set; } = new List<Player>();
-        public List<Player> SubMidfielders { get; set; } = new List<Player>();
-
-        public List<Player> Forwards { get; set; } = new List<Player>();
-        public List<Player> SubForwards { get; set; } = new List<Player>();
-
-        public List<Player> AllPlayers
-        {
-            get
-            {
-                var toReturn = new List<Player>();
-                toReturn.AddRange(Defenders);
-                toReturn.AddRange(SubDefenders);
-
-                toReturn.AddRange(Midfielders);
-                toReturn.AddRange(SubMidfielders);
-
-                toReturn.AddRange(Forwards);
-                toReturn.AddRange(SubForwards);
-                toReturn.Add(Gk);
-                toReturn.Add(SubGk);
-
-                return toReturn;
-            }
-        }
-
-        public List<Player> FirstTeamPlayers
-        {
-            get
-            {
-                var toReturn = new List<Player>();
-                toReturn.AddRange(Defenders);
-                toReturn.AddRange(Midfielders);
-                toReturn.AddRange(Forwards);
-                toReturn.Add(Gk);
-
-                return toReturn;
-            }
-        }
-
-        public double FirstTeamCost
-        {
-            get
-            {
-                return Defenders.Sum(x => x.Cost) + Midfielders.Sum(x => x.Cost) + Forwards.Sum(x => x.Cost) + Gk.Cost;
-            }
-        }
-
-        public double SubstitutesCost
-        {
-            get
-            {
-                return SubDefenders.Sum(x => x.Cost) + SubMidfielders.Sum(x => x.Cost) + SubForwards.Sum(x => x.Cost) + SubGk.Cost;
-            }
-        }
-
-        public bool IsClubRuleOk
-        {
-            get
-            {
-                return AllPlayers.GroupBy(x => x.Team).All(x => x.Count() <= 3);
-            }
-        }
-
-        public double TotalTeamCost
-        {
-            get
-            {
-                return AllPlayers.Sum(x => x.Cost);
-            }
-        }
-
-        public override string ToString()
-        {
-            StringBuilder sb = new StringBuilder();
-
-            sb.AppendLine(Gk.Info);
-            sb.AppendLine(string.Join(", ", Defenders.Select(x => x.Info)));
-            sb.AppendLine(string.Join(", ", Midfielders.Select(x => x.Info)));
-            sb.AppendLine(string.Join(", ", Forwards.Select(x => x.Info)));
-
-            sb.AppendLine("--------------------------");
-
-            sb.AppendLine(SubGk.Info);
-            sb.AppendLine(string.Join(", ", SubDefenders.Select(x => x.Info)));
-            sb.AppendLine(string.Join(", ", SubMidfielders.Select(x => x.Info)));
-            sb.AppendLine(string.Join(", ", SubForwards.Select(x => x.Info)));
-
-            return sb.ToString();
-        }
-
-    }
-
-    public class Player
-    {
-        public JToken PlayerJson { get; set; }
-        public string Id { get; set; }
-        public string FirstName { get; set; }
-        public string SecondName { get; set; }
-        public Position Position { get; set; }
-        public string Team { get; set; }
-        public int Used { get; set; }
-        public double TotalPoints { get; set; }
-        public string Form { get; set; }
-        public string GoalsScored { get; set; }
-        public string GoalsConceded { get; set; }
-        public string Assists { get; set; }
-        public string MinutesPlayed { get; set; }
-        public string ChancePlayingThis { get; set; }
-        public string ChancePlayingNext { get; set; }
-        public string Selected { get; set; }
-        public double Cost { get; set; }
-        public double Weight { get; set; }
-
-        public string Info
-        {
-            get
-            {
-                return $"{FirstName} {SecondName} ({Team}, {Position.ToString()})";
-            }
-        }
-    }
-
-    class Program
-    {
-        static string host = @"https://fantasy.premierleague.com/";
         //316403 - nasata
         //313 - overall
         //147 - macedonia
-        static string standings = @"api/leagues-classic/1006694/standings/?page_new_entries=1&page_standings={0}&phase=1";
-        static string statics = @"api/bootstrap-static/";
-        static string teamPicks = @"api/entry/{0}/event/{1}/picks/";
+        private static readonly string standings = @"api/leagues-classic/1006694/standings/?page_new_entries=1&page_standings={0}&phase=1";
+        private static readonly string statics = @"api/bootstrap-static/";
+        private static readonly string teamPicks = @"api/entry/{0}/event/{1}/picks/";
+        private static readonly int TotalPlayersConsidered = 50;
 
-        static int TotalPlayersConsidered = 50;
-
-        private static List<string> TopUserTeamCodes = new List<string>();
+        private static readonly List<string> TopUserTeamCodes = new List<string>();
         private static List<Player> MostWeightedPlayers = new List<Player>();
 
-        private static Dictionary<string, JToken> Players = new Dictionary<string, JToken>();
-        private static Dictionary<string, JToken> Clubs = new Dictionary<string, JToken>();
-        private static Dictionary<string, JToken> Events = new Dictionary<string, JToken>();
+        private static readonly Dictionary<string, JToken> Players = new Dictionary<string, JToken>();
+        private static readonly Dictionary<string, JToken> Clubs = new Dictionary<string, JToken>();
+        private static readonly Dictionary<string, JToken> Events = new Dictionary<string, JToken>();
 
         private static string CurrentGameweekId;
-        private static object _lock = new object();
+        private static readonly object _lock = new object();
 
-        private static Team BestTeam = new Team();
+        private static readonly Team BestTeam = new Team();
 
         private static double UsedWeight = 1;
         private static double TotalPointsWeight = 0;
 
-        static async Task Main(string[] args)
+        public static HubConnection Connection { get; private set; }
+
+        private static async Task Main(string[] args)
         {
+
+            Connection = new HubConnectionBuilder()
+                .WithUrl("http://localhost:5000/hub")
+                .Build();
+
+            Connection.Closed += async (error) =>
+            {
+                await Task.Delay(new Random().Next(0, 5) * 1000);
+                await Connection.StartAsync();
+            };
+
+            await Connection.StartAsync();
+
             Console.WriteLine("Enter Used weight (default 1):");
             var entered = Console.ReadLine();
             UsedWeight = double.Parse(string.IsNullOrEmpty(entered) ? "1" : entered);
-        
+
             Console.WriteLine("Enter Total points weight (default 0):");
             entered = Console.ReadLine();
             TotalPointsWeight = double.Parse(string.IsNullOrEmpty(entered) ? "0" : entered);
@@ -198,6 +72,8 @@ namespace Fantasy
             Console.Clear();
 
             PrintTable();
+
+            await SendDataToServer();
 
             Console.WriteLine("Try make best team? (Y/N)");
             if (Console.ReadLine().ToLower() == "y")
@@ -365,6 +241,11 @@ namespace Fantasy
             Console.WriteLine("Total team cost {0}", BestTeam.TotalTeamCost);
         }
 
+        private static async Task SendDataToServer()
+        {
+            await Connection.InvokeAsync("SendData", JArray.FromObject(MostWeightedPlayers).ToString(Newtonsoft.Json.Formatting.None));
+        }
+
         private static void PrintTable()
         {
             Console.WriteLine(MostWeightedPlayers.ToStringTable(
@@ -445,13 +326,12 @@ namespace Fantasy
                                     Selected = player["selected_by_percent"].ToString(),
                                     Team = Clubs[player["team_code"].ToString()]["short_name"].ToString(),
                                     Cost = double.Parse(cost),
-                                    Position = pos,
-                                    PlayerJson = player
+                                    Position = pos
                                 };
 
                                 //if (pl.ChancePlayingNext == "100")
                                 //{
-                                    MostWeightedPlayers.Add(pl);
+                                MostWeightedPlayers.Add(pl);
                                 //}
                             }
                         }
@@ -465,7 +345,7 @@ namespace Fantasy
             {
                 //percentage of usage
                 var used = player.Used / (double)TotalPlayersConsidered;
-               
+
                 var totalPoints = player.TotalPoints / Events.Count;
                 player.Weight = Math.Round((used * UsedWeight) + (totalPoints * TotalPointsWeight), 3);
             }
@@ -527,7 +407,7 @@ namespace Fantasy
                 httpClient.BaseAddress = new Uri(host);
                 httpClient.DefaultRequestHeaders.Clear();
                 httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36");
-                httpClient.DefaultRequestHeaders.Add("Cookie", "_ga=GA1.2.1480701568.1566132699; pl_profile=\"eyJzIjogIld6SXNOREV4TWpBNU5UVmQ6MWh6S2ZsOnVxT1M2UmV2TXIwaXFZeU1IbHNlWGVUdk9CMCIsICJ1IjogeyJpZCI6IDQxMTIwOTU1LCAiZm4iOiAiTWFya28iLCAibG4iOiAiVnVja292aWsiLCAiZmMiOiBudWxsfX0=\"; csrftoken=WOjPvRKPx3ZeKxSYxTnZQNSGOJIiHeU5gog92kgVFTuGtgCY6Lw35JrSTBT12w5c; sessionid=.eJyrVopPLC3JiC8tTi2Kz0xRslIyMTQ0MrA0NVXSQZZKSkzOTs0DyRfkpBXk6IFk9AJ8QoFyxcHB_o5ALqqGjMTiDKBqwzST5DRzizRjgzRj0zQTI5NEAzNTC9NkM6ANyRZJFibGKSaGFpbGSrUAdi4rvg:1hzKfm:eAgbtKFgU5gY9mRGJnn2hszQRPk; _gid=GA1.2.721012367.1567081929; _gat=1");
+                httpClient.DefaultRequestHeaders.Add("Cookie", "_ga=GA1.2.856257012.1565381471; _fbp=fb.1.1565381471758.629943535; __gads=ID=dd2f98190653b470:T=1565381527:S=ALNI_MbCepgm1eFYdlGhNtJtzX1STPVLuQ; pl_profile=\"eyJzIjogIld6SXNOREV4TWpBNU5UVmQ6MWkyQ1VZOlBEQlBDekFTN0dnLWdLMERpR3lsenRxQXA0YyIsICJ1IjogeyJpZCI6IDQxMTIwOTU1LCAiZm4iOiAiTWFya28iLCAibG4iOiAiVnVja292aWsiLCAiZmMiOiBudWxsfX0 = \"; csrftoken=edysqqUqtl2bu6gUPf9ajbDv2GztavpL7AOaoFj4302uvmC8JWxPT4f2qV8dGt9t; sessionid=.eJyrVopPLC3JiC8tTi2Kz0xRslIyMTQ0MrA0NVXSQZZKSkzOTs0DyRfkpBXk6IFk9AJ8QoFyxcHB_o5ALqqGjMTiDKBqwzST5DRzizRjgzRj0zQTI5NEAzNTC9NkM6ANyRZJFibGKSaGFpbGSrUAdi4rvg:1i2CUY:co49x5tpXtyAxUC34sb3hCQPz2A; _gid=GA1.2.425468677.1567423765; _gat=1");
 
                 var result = await httpClient.GetAsync(path);
                 if (result.IsSuccessStatusCode)
@@ -535,19 +415,6 @@ namespace Fantasy
                     action(result);
                 }
             }
-        }
-    }
-
-    public static class Extensions
-    {
-        public static Player LeastWeight(this IEnumerable<Player> list)
-        {
-            return list.OrderBy(x => x.Weight).First();
-        }
-
-        public static Player MostWeight(this IEnumerable<Player> list)
-        {
-            return list.OrderByDescending(x => x.Weight).FirstOrDefault();
         }
     }
 }

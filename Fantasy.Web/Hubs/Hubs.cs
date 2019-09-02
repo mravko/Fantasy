@@ -1,13 +1,27 @@
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Caching.Memory;
 using System.Threading.Tasks;
 
 namespace Fantasy.Web
 {
-    public class Hubs : Hub
+    public class Hubs : Hub<IComHub>
     {
-        public async Task SendMessage(string user, string message)
+        private readonly IMemoryCache memoryCache;
+
+        public Hubs(IMemoryCache memoryCache)
         {
-            await Clients.All.SendAsync("ReceiveMessage", user, message);
+            this.memoryCache = memoryCache;
         }
+
+        public async Task SendData(string data)
+        {
+            memoryCache.Set("teamcache", data);
+            await Clients.All.ReceiveData(data);
+        }
+    }
+
+    public interface IComHub
+    {
+        Task ReceiveData(string data);
     }
 }
